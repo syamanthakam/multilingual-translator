@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const LANGS = [
   { code: 'auto', name: 'Auto-detect' },
@@ -17,6 +17,28 @@ export default function App() {
   const [target, setTarget] = useState('en')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const streamingTimer = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (streamingTimer.current) clearInterval(streamingTimer.current)
+    }
+  }, [])
+
+  function startStreaming(text) {
+    if (streamingTimer.current) clearInterval(streamingTimer.current)
+    setOutput('')
+
+    let index = 0
+    streamingTimer.current = setInterval(() => {
+      index += 1
+      setOutput(text.slice(0, index))
+      if (index >= text.length && streamingTimer.current) {
+        clearInterval(streamingTimer.current)
+        streamingTimer.current = null
+      }
+    }, 20) // 50 chars/sec-ish
+  }
 
   async function handleTranslate(e) {
     e.preventDefault()
@@ -44,7 +66,8 @@ export default function App() {
         throw new Error(data.error || 'Translation failed')
       }
 
-      setOutput(data.translated)
+      // Animate character-by-character display of the translated text.
+      startStreaming(data.translated)
     } catch (err) {
       setError(err.message || 'Something went wrong')
     } finally {
@@ -55,7 +78,10 @@ export default function App() {
   return (
     <div style={{ maxWidth: 800, margin: '2rem auto', fontFamily: 'system-ui' }}>
       <h1>Multilingual Translator</h1>
-      <p>Real-time text translation between multiple languages.</p>
+      <p>
+        Real-time text translation between multiple languages with a
+        character-by-character streaming display.
+      </p>
 
       <form onSubmit={handleTranslate} style={{ marginTop: '1rem' }}>
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
@@ -100,9 +126,11 @@ export default function App() {
           border: '1px solid #ccc',
           borderRadius: 4,
           background: '#fafafa',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          whiteSpace: 'pre-wrap',
         }}
       >
-        {output || <span style={{ color: '#888' }}>Your translated text will appear here.</span>}
+        {output || <span style={{ color: '#888' }}>Your translated text will appear here, streaming character by character.</span>}
       </div>
     </div>
   )
